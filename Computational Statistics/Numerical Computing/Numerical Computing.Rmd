@@ -1,0 +1,257 @@
+---
+title: "MA589 Proj1"
+author: "Zihuan Qiao  U65762086"
+date: "9.27.2016"
+output: pdf_document
+---
+##1
+###(a)
+```{r}
+eye <- function(matrix)
+{
+  diag(ncol(matrix))
+}
+```
+
+###(b)
+```{r}
+hilbert <- function(n)
+{
+  outer(1:n,1:n,function(i,j){1/(i+j-1)})
+}
+```
+
+###(c) approach 1
+```{r}
+library(magrittr)
+tr <- function(matrix)
+{
+  eigen(matrix)$values%>%sum()
+}
+```
+
+###(c) approach 2
+```{r}
+tr <- function(matrix)sum(diag(matrix))
+```
+
+###(d)
+```{r}
+norm2 <- function(vector)
+{
+  library(magrittr)
+  a <- abs(vector)%>%max()
+  a*sqrt(crossprod(vector/a,vector/a))
+}
+norm2(1e200*rep(1,100))
+```
+
+###(e)
+```{r}
+invtri <- function(umatrix)
+{
+  eye <- function(matrix)
+  {
+    diag(ncol(matrix))
+  }
+  tcrossprod(backsolve(umatrix,eye(umatrix)))
+}
+```
+
+##2
+###(a)
+```{r}
+epsilon <- function()
+{
+  eps <- 1
+  while((1+eps<=1)|(1+eps/2!=1))
+  {
+    eps <- eps/2
+  }
+  eps
+}
+```
+
+###(b)
+```{r}
+lg <- function(x)
+{
+  log(1+exp(x))
+}
+lg(0)
+lg(-80)
+lg(80)
+lg(800)
+```
+
+###(c)
+```{r}
+lgmini <- function(x)
+{
+  if(exp(x)>epsilon()/2)
+  {log(1+exp(x))}
+  else
+  {log(1)}
+}
+```
+
+###(d)
+```{r}
+lgmax <- function(x)
+ {
+   for(i in 1:50)
+   {
+     if(exp(i)==exp(i)+1)
+     {
+       a <- i
+       break
+     }
+   }
+   if(x<a)
+   {
+     return(log(1+exp(x)))
+   }
+   else
+   {
+     return(x)
+   }
+}
+lgmax(800)
+```
+
+##3
+###(a)
+```{r}
+lstirling <- function(n,k)
+{
+  j <- c(0:k)
+  S <-  sum((-1)^(k-j)*choose(k,j)*j^n)/factorial(k)
+  log(S)
+}
+lstirling(10,1)-log(1)
+lstirling(10,2)-log(511)
+lstirling(10,3)-log(9330)
+lstirling(10,4)-log(34105)
+lstirling(10,5)-log(42525)
+lstirling(10,6)-log(22827)
+lstirling(10,7)-log(5880)
+lstirling(10,8)-log(750)
+lstirling(10,9)-log(45)
+lstirling(10,10)-log(1)
+```
+
+###(b)
+```{r}
+lstirling <- function(n,k)
+{
+  j <- c(0:k)
+  S <-  sum((-1)^(k-j)*choose(k,j)*j^n)/factorial(k)
+  log(S)
+}
+
+#lstirling(100,99)
+k <- 99
+n <- 100
+j <- c(0:99)
+S <-  sum((-1)^(k-j)*choose(k,j)*j^n)/factorial(k)
+#lstirling(100,99) returns NaNs
+#S(100,99) is -6.243607e+38<0, so log(S) is not available
+
+#lstirling(100,100)
+k <- 100
+n <- 100
+j <- c(0:100)
+S <-  sum((-1)^(k-j)*choose(k,j)*j^n)/factorial(k)
+#lstirling(100,100) returns NaNs
+#S(100,100) is -7.63941e+37<0, so log(S) is not available
+```
+
+###(c)
+```{r}
+lstirling <- function(n,k)
+{
+  S <- function(x,y)
+  {
+    if(x==y)
+    {
+      return(1)
+    }
+    else if((y==0)|(x==0))
+    {
+      return(0)
+    }
+    else
+      return(y*S(x-1,y)+S(x-1,y-1))
+  }
+  log(S(n,k))
+}
+lstirling(100,99)
+lstirling(100,100)
+```
+
+##4
+```{r}
+hilbert <- function(n)
+{
+  outer(1:n,1:n,function(i,j){1/(i+j-1)})
+}
+norm2 <- function(vector)
+{
+  library(magrittr)
+  a <- abs(vector)%>%max()
+  a*sqrt(crossprod(vector/a,vector/a))
+}
+X <- hilbert(7)
+y <- rep(1,7)
+
+#(a)
+q <- qr(X)
+norm2(backsolve(qr.R(q),qr.qty(q,y)))
+
+#(b)
+eye <- function(matrix)
+{
+  diag(ncol(matrix))
+}
+ridgenorms <- function(lamda,X,y)
+{
+  YY <- c(y,rep(0,nrow(X)))
+  XX <- rbind(X,sqrt(lamda)*eye(X))
+  q <- qr(XX)
+  norm2(backsolve(qr.R(q),qr.qty(q,YY)))
+}
+l <- 0:17
+lamda <- 10^(-l)
+betahat <- sapply(lamda,ridgenorms,X,y)
+plot(l,betahat)
+
+#(c)
+invtri <- function(umatrix)
+{
+  eye <- function(matrix)
+  {
+    diag(ncol(matrix))
+  }
+  tcrossprod(backsolve(umatrix,eye(umatrix)))
+}
+library(magrittr)
+tr <- function(matrix)
+{
+  eigen(matrix)$values%>%sum()
+}
+
+effdf <- function(lamda,X)
+{
+  R <- qr.R(qr(X))
+  tr(invtri(chol(eye(R)+lamda*invtri(R))))
+}
+
+#(d)
+l <- 0:17
+lamda <- 10^(-l)
+effdf_lamda <- sapply(lamda,effdf,X)  
+plot(l,effdf_lamda)
+```
+
+
+

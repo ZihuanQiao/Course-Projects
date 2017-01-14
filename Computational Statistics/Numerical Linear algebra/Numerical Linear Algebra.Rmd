@@ -1,0 +1,206 @@
+---
+title: "Project 2"
+author: "Zihuan Qiao  U65762086"
+date: "2016/10/8"
+output: pdf_document
+---
+###1.(a)
+```{r}
+horner <- function (coef)
+  return(function (x) {
+    s <- 0
+    for (i in seq(length(coef), 1, -1)) {
+      s <- s * x + coef[i]
+    }
+    return(s) })
+test <- c(1,-2,1)
+p <- horner(test)
+p
+```
+
+Explanation: Horner works because it starts by getting the coefficient for \(x^n\), the coefficient for the term in the polynomial with the highest degree. Then every time in the loop, the result for the last loop times x and plus the coefficient for the term with the second highest degree. For each loop, all the terms entered times x, and the new term gets its coefficient. Finally, the term enters first times x for n times altogether, and gets its corresponding coefficient the time it enters. Similar cases are the other terms.
+The mathematical expression is: \(p(x_i) = p(x_{i-1})*x+coef[length(coef)-i+1]\), \(p(x_0)=0\)
+
+###1.(b)
+```{r}
+horner <- function (coef)
+  return(function (x) {
+    s <- 0
+    for (i in seq(length(coef), 1, -1)) {
+      s <- s * x + coef[i]
+    }
+    return(s) })
+p <- horner(c(2,-1,-2,1))
+curve(p,-2,3)
+```
+
+###1.(c)
+```{r}
+horner <- function (coef)
+  return(function (x) {
+    s <- 0
+    for (i in seq(length(coef), 1, -1)) {
+      s <- s * x + coef[i]
+    }
+    return(s) })
+hornerder <- function (coef)
+  return(function (x) {
+    s <- 0
+    for (i in seq(length(coef), 2, -1)) {
+      s <- s * x + (i-1)*coef[i]
+    }
+    return(s) })
+
+test <- c(2,-1,-2,1)
+p <- horner(test)
+pder <- hornerder(test)
+
+epsilon <- function()
+{
+  eps <- 1
+  while((1+eps<=1)|(1+eps/2!=1))
+  {
+    eps <- eps/2
+  }
+  eps
+}
+
+root <- function(x)
+{
+  l=x;n=l-p(l)/pder(l) #l is last estimate root for p, n is next root for p
+  while(abs(l-n)>=epsilon())
+  {
+    l=n
+    n=l-p(l)/pder(l)
+  }
+  return(l)
+}
+
+root(-0.5)
+root(0)
+root(0.5)
+```
+
+###1.(c) annotation2:return the coefficient of p'
+```{r}
+coep <- function(coef)
+{
+  a <- coef[-1]
+  for(i in 1:length(a))
+  {
+    a[i] <- a[i]*i
+  }
+  return(a)
+}
+
+test <- c(2,-1,-2,1)
+coep(test)
+```
+
+###2.
+```{r}
+#(a)
+x <- seq(-2,3,0.5)
+y <- c(-5.22,-2.21,0.11,0.94,0.71,-0.17,0.56,-0.94,-0.79,-1.15,-0.25)
+X <- matrix(c(rep(1,11),x,x^2,x^3),nrow=11,byrow=FALSE)
+XtX <- crossprod(X)
+Xty <- crossprod(X,y)
+T <- rbind(cbind(XtX,Xty),cbind(crossprod(y,X),crossprod(y)))
+T
+
+#(b)
+SWEEP <- function(T,k)
+{
+  D <- T[k,k]
+  T[k,] <- T[k,]/D
+  for(i in 1:nrow(T))
+  {
+    if(i!=k){
+    B <- T[i,k]
+    T[i,] <- T[i,]-B*T[k,]
+    T[i,k] <- -B/D
+    }
+  }
+  T[k,k] <- 1/D
+  return(T)
+}
+
+for(k in 1:4)
+{
+  print(SWEEP(SWEEP(T,k),k))
+}
+
+#(c)
+horner <- function (coef)
+  return(function (x) {
+    s <- 0
+    for (i in seq(length(coef), 1, -1)) {
+      s <- s * x + coef[i]
+    }
+    return(s) })
+
+plot(x, y)
+a <- seq(-2, 3, length.out = 100)
+p <- ncol(T) - 1
+for (k in 1:p) {
+  T <- SWEEP(T, k)
+  lines(a, horner(T[1:k, p + 1])(a), lty = k)
+  print(c(k, T[p + 1, p + 1]))
+}
+```
+
+A regression model with the degree that is k is plotted at each k. Each point on the lines or curves represents the value of the regression function, \(y_i=\sum_{j=0}^{k-1}\beta_jx_i^j\) corresponding to every one in 100 a values. For example, when k is 2, the function plots the linear regression function \(y_i=\beta_0+\beta_1x_i\) for x_i being 100 arithmetric progression numbers from -2 to 3. So when k is 2, a linear line is plotted. Similarly, when k is 1, it's a horizontal straight line. When k is 2, it's a linear line. When k is 3, it's a parabola. And when k is 4, it's a curve. Also we can see from the plot that when k is 4, the regression model fits the points the best.
+
+The RSS value for the regression model with the degree that is k is printed at each k. For example, when k is 2, the RSS for the linear regression function \(y_i=\beta_0+\beta_1x_i\) is printed as 25.74358. The smaller the value of RSS, the better the corresponding model fits the data.
+
+###2.(e)*
+```{r}
+epsilon <- function()
+{
+  eps <- 1
+  while((1+eps<=1)|(1+eps/2!=1))
+  {
+    eps <- eps/2
+  }
+  eps
+}
+
+eye <- function(matrix)
+{
+  diag(ncol(matrix))
+}
+
+x <- seq(-2,3,0.5)
+y <- c(-5.22,-2.21,0.11,0.94,0.71,-0.17,0.56,-0.94,-0.79,-1.15,-0.25)
+X <- matrix(c(rep(1,11),x,x^2,x^3),nrow=11,byrow=FALSE)
+y <- as.matrix(y)
+
+XtX <- crossprod(X)
+Xty <- crossprod(X,y)
+
+XtX[lower.tri(XtX,diag=FALSE)]=0
+UD <- XtX
+XtX <- crossprod(X)
+XtX[upper.tri(XtX,diag=TRUE)]=0
+L <- XtX
+
+mod <- function(x)
+{
+  sum(x^2)/length(x)
+}
+
+GS <- function(beta0)
+{
+  l <- beta0
+  n <- backsolve(UD,eye(UD))%*%(Xty-L%*%l)
+  while(mod(abs(l-n))/mod(abs(l))>epsilon())
+    {
+      l <- n
+      n <- backsolve(UD,eye(UD))%*%(Xty-L%*%l)
+    }
+  n
+}
+
+GS(rep(1,4))
+```
+

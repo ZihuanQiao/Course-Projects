@@ -1,0 +1,454 @@
+---
+title: "Miterm Project Presentation"
+author: "Zihuan Qiao  Team Member: CJ"
+date: "2016/10/24"
+output: pdf_document
+---
+#1. Introdunction to Dataset
+##a. Data Background 
+Gas and oil industries play significant roles in a nation's economy. And development of gas and oil industries depend a lot on locations. In this project, by looking at the County-level annual gross withdrawals of oil and gas in US, we try to explore some useful information about the distribution of oil and gas withdrawals in different counties and states through years from 2000 to 2011. County-level data from oil and/or natural gas producing States—for onshore production in the lower 48 States only—are compiled on a State-by-State basis. 
+
+##b. Data Source
+Data used in this project is aquired from ERS which stands for Economic Research Service. Data used in this project can be downloaded from website:http://www.ers.usda.gov/data-products/county-level-oil-and-gas-production-in-the-us.aspx.
+
+Most States have production statistics available by county, field, or well, and these data were compiled by ERS at the county level to create a database of county-level production, annually for 2000 through 2011. The dataset is also maintained by ERS. Up till now, the County-level data has been updated to year 2011. Currently, an ERS update to this data product is not planned. 
+
+#2. Data Wrangling
+Noticing raw data is not clean enough for further exploration because several column headers are values, not variable names. So we use commands gather, mutate, filter and select from tidyr and dplyr packages to do the data wrangling. Finaly, tidy data is saved as oilTidyData.txt for later use. 
+
+Related code and result are as follows:
+```{r}
+library(tidyr)
+library(dplyr)
+
+
+#load data
+data.raw <- read.csv("oilgascounty.csv")
+
+#convert data type to data frame
+data0 <- data.frame(data.raw)
+head(data0)
+
+#gather oil data from 2000 to 2011 
+data.oil0 <- gather(data0, year, oilwithdraw, oil2000:oil2011)
+data.oil <- mutate(data.oil0, year=(gsub("oil","",year)))
+
+#gather gas data from 2000 to 2011 on the biasis of data.oil 
+data.gas0 <- gather(data.oil, year2, gaswithdraw, gas2000:gas2011)
+data.gas <- mutate(data.gas0, year2=(gsub("gas","",year2)))
+
+#delete verbose rows where year != year2 
+data1 <- filter(data.gas, year == year2)
+
+#delete verbose column year2
+data <- select(data1, -year2)
+
+#adjust columns order
+Tidydata <- data[, c(1:8, 12:14, 9:11)]
+head(Tidydata)
+
+write.table(Tidydata, "oilTidyData.txt")
+
+```
+
+
+#3. Data Summarization
+##a. Variable Descriptions
+```{r}
+dfnew <- read.table("oilTidyData.txt")
+dfnew <- data.frame(dfnew)
+dim(dfnew)
+```
+There are 14 variables in the tidy data. Their names and descriptions are as follows:
+\begin{center}
+\begin{tabular}{|c|c|}\hline
+Variable Name&Description and Variable Labels\\\hline
+FIPS&Five-digit Federal Information Processing Standard (FIPS) code (numeric) \\\hline
+geoid&FIPS code with leading zero (string) \\\hline
+Stabr&State abbreviation (string) \\\hline
+County Name&County name (string) \\\hline
+Rural Urban Continuum Code2013&Rural-urban Continuum Code, 2013 (see code descriptions) \\\hline
+Urban Influence 2013&Urban Influence Code, 2013 (see code descriptions) \\\hline
+Metro Nonmetro2013&Metro-nonmetro 2013 (0=nonmetro, 1=metro) \\\hline
+Metro Micro Noncore2013&Metro Micro Noncore indicator 2013 (0=nonmetro noncore, 1=nonmetro micropolitan, 2=metropolitan) \\\hline
+year&year of data \\\hline
+oilwithdraw&Annual gross withdrawals (barrels) of crude oil, for the year specified in the variable name \\\hline
+gaswithdraw&Annual gross withdrawals (1,000 cubic feet) of natural gas, for the year specified in the variable name \\\hline
+oil change group&Categorical variable based upon change in the dollar value of oil production \\\hline
+gas change group&Categorical variable based upon change in the dollar value of natural gas production \\\hline
+oil gas change group&Categorical variable based on the change in the dollar value of the sum of oil and natural gas production \\\hline
+\end{tabular}
+\end{center}
+
+##b. Tidy Data Summarization 
+```{r}
+#basic data summary: mean, max, min, etc.
+dfnew <- read.table("oilTidyData.txt")
+str(dfnew)
+summary(dfnew)
+```
+Tidy data has 14 variables with 37308 observations. Basic summarization including min, 1st Qu, median, mean, 3rd Qu, max for each variable is shown above.
+
+#4. Data Exploration
+##a. Year Based Exploration
+###(i) National Oil and Gas gross Withdrawals from 2000 to 2011
+```{r}
+library(ggplot2)
+library(dplyr)
+
+
+#read tidy data 
+dfnew <- read.table("oilTidyData.txt")
+dfnew <- data.frame(dfnew)
+
+#select top 10000 oil/ gas withdraw county data
+dfnew.oil <- arrange(dfnew, desc(oilwithdraw))
+dfnew.oil <- dfnew.oil[1:10000,]
+dfnew.gas <- arrange(dfnew, desc(gaswithdraw))
+dfnew.gas <- dfnew.gas[1:10000,]
+
+#draw point plot and line to indicate oil/ gas withdraws from year to year in terms of state
+gg <- ggplot(dfnew.oil, aes(x = year, y = oilwithdraw, colour = factor(Stabr)))
+gg + geom_point() + labs(title = "Oil Withdraw from 2000 to 2011", x = "Year", y = "Oil Withdraw") 
+qq <- ggplot(dfnew.gas, aes(x = year, y = gaswithdraw, colour = factor(Stabr)))
+qq + geom_point() + labs(title = "Gas Withdraw from 2000 to 2011", x = "Year", y = "Gas Withdraw") 
+
+```
+
+Point plot <Oil Withdraw from 2000 to 2011> shows the oil annual gross withdraw of each state from 2000 to 2011. From the plot, we can see the level of oil withdrawals from 2000 to 2011 of each state. Also we can see the trend of each state from year to year. For example, CA has the highest level of oil withdrawals from 2000 to 2011 And its level of oil withdrawals is in a continuous decrease from 2000 to 2011.
+
+Similarly, Point plot <Gas Withdraw from 2000 to 2011> shows the gas annual gross withdraw of each state from 2000 to 2011. From the plot, we can see the level of oil withdrawals from 2000 to 2011 of each state. Also we can see the trend of each state from year to year. But situation with gas annual gross eithdrawals is much more complicated than the sitution with oil annual gross eithdrawals. NE has the highes level of gas annual gross eithdrawals in the first three years but it continues to drop through the years while AL keeps increasing its gas annual gross eithdrawals and surpass NE in 2003. But later in 2011, it is surpassed by LA.
+
+##b. Location Based Exploration
+###(i) National Oil and Gas Gross Withdrawals of Each State
+```{r}
+#Oil and Gas total gross withdrawals distribution on the state level
+
+library(ggplot2)
+library(magrittr)
+
+
+#read tidy data and select subset
+dfnew <- read.table("oilTidyData.txt")
+attach(dfnew)
+dfnew.state <- dfnew %>% select(Stabr, year : gaswithdraw)
+
+
+#Draw bar graghics: Oil total gross withdrawals distribution on the state level
+gg <- ggplot(data = dfnew.state, aes(x = Stabr, y = oilwithdraw, fill = factor(year))) 
+gg + geom_bar(stat = "identity") + 
+  labs(title = "Oil total gross withdrawals from 2000 to 2011", x = "State", y = "Total Oil Withdrawals")
+
+#Draw bar graghics: Gas total gross withdrawals distribution on the state level
+gg <- ggplot(data = dfnew.state, aes(x = Stabr, y = gaswithdraw, fill = factor(year))) 
+gg + geom_bar(stat = "identity") + 
+  labs(title = "Gas total gross withdrawals from 2000 to 2011", x = "State", y = "Total Gas Withdrawals")
+
+```
+
+```{r}
+# Present top 10 biggest oil/ gas production states in piechart
+library(ggplot2)
+
+
+#read tidy data 
+dfnew <- read.table("oilTidyData.txt")
+dfnew <- data.frame(dfnew)
+
+# Present top 10 biggest oil production states in piechart
+newstatesoil <- dfnew %>% group_by(Stabr) %>% summarize(sum_oil = sum(as.numeric(oilwithdraw)))
+# We find that the pie chart is too dense. Let's list top 10 states, and its relative pie chart
+newstatedata <- newstatesoil[order(-newstatesoil$sum_oil),]
+# Now, here comes the top 10 states in oilwithdraw
+Cleanstatedata <- newstatedata[1:10,]
+pie(Cleanstatedata$sum_oil, labels = Cleanstatedata$Stabr, col = rainbow(length(Cleanstatedata$Stabr)),main = "Pie chart of oil withdraws in top 10 states")
+
+# Present top 10 biggest gas production states in piechart
+newstatesgas <- dfnew %>% group_by(Stabr) %>% summarize(sum_gas = sum(as.numeric(gaswithdraw)))
+newstatedata1 <- newstatesgas[order(-newstatesgas$sum_gas),]
+# Now, here comes the top 10 states in gaswithdraw
+Cleanstatedata1 <- newstatedata1[1:10,]
+pie(Cleanstatedata1$sum_gas, labels = Cleanstatedata1$Stabr, col = rainbow(length(Cleanstatedata1$Stabr)),main = "Pie chart of gas withdraws in top 10 states")
+
+```
+
+Oil and gas total gross withdrawals from 2000 to 2011 are shown by bar graph. Each bar consists of annual gross withdrawals from 2000 to 2011 of each state, each color represent a specific year. 
+
+We can see from the <Oil total gross withdrawals from 2000 to 2011>, TX has the highest level of oil total gross withdrawals from 2000 to 2011 and CA follows. Moreover, states tend to have higher level of oil total gross withdrawals from 2000 to 2011 in 2011.
+
+Similar expanation can be applied to gas total gross withdrawals from 2000 to 2011.
+TX has the highest level of oil total gross withdrawals from 2000 to 2011 and WY, LA, MN, OK follows whose gaps are not that big. 
+
+However, because there are 48 states shown in the bar gragh, the x lable is little bit too close which add difficulty in identificaiton, two corresponding pie charts are drawn choosing data from oil/ gas gross withdrawals top 10 states. The same conclusion as above can be drawn easier by looking at the pie chart which is clearer.
+
+###(ii) Oil and gas average gross withdrawals level on the county level
+```{r}
+#Oil and Gas total gross withdrawals distribution map on the county level
+library(ggplot2)
+library(magrittr)
+library(maps)
+library(dplyr)
+library(tidyr)
+
+
+#read tidy data and basic data summary
+dfnew <- read.table("oilTidyData.txt")
+dfnew <- data.frame(dfnew)
+
+
+#Prepare dataset for Oil and Gas total gross withdrawals distribution on the county level from 2000 to 2011
+#Create new varibles to indicate mean of oil withdraws and gas withdraws during 2000-2011
+dfnew.county0 <- dfnew %>% select(Stabr, County_Name, year : oil_gas_change_group )
+dfnew.countyoil <- dfnew.county0 %>% group_by(County_Name) %>% summarize(averageOil = mean(oilwithdraw))
+dfnew.countygas <- dfnew.county0 %>% group_by(County_Name) %>% summarize(averageGas = mean(gaswithdraw))
+dfnew.county <- merge(dfnew.countyoil, dfnew.countygas)
+dfnew.county <- merge(dfnew.county, dfnew.county0, by="County_Name") 
+dfnew.county <- select(dfnew.county, Stabr, County_Name:averageGas) %>% distinct()
+
+dfnew.change <- dfnew %>% select(Stabr, County_Name, oil_change_group : oil_gas_change_group)
+dfnew.county <- merge(dfnew.county, dfnew.change, by= c("Stabr", "County_Name"))
+
+#Rename county_name and state abbreviation to the standard format is shown in the map regerence
+colnames(dfnew.county)[1] <- "region"
+colnames(dfnew.county)[2] <- "subregion"
+dfnew.county <- mutate(dfnew.county, subregion=(gsub("County", "", subregion)))
+for (i in 1:length(letters))
+{
+  dfnew.county$subregion <- sub(LETTERS[i], letters[i], dfnew.county$subregion)
+}
+for (i in 1:length(state.abb)) 
+{
+  dfnew.county$region <- sub(state.abb[i], state.name[i], dfnew.county$region)
+}
+for (i in 1:length(letters))
+{
+  dfnew.county$region <- sub(LETTERS[i], letters[i], dfnew.county$region)
+}
+dfnew.county <- mutate(dfnew.county,subregion=gsub(" ","",subregion))
+
+dfnew.change <- select(dfnew.county, region:subregion, oil_change_group:oil_gas_change_group)
+dfnew.county <- select(dfnew.county, -(oil_change_group:oil_gas_change_group))
+
+#Add new columns to show average oil/ gas level, 9 levels altogether
+dfnew.county <- mutate(dfnew.county, OilLevel=0)
+dfnew.county <- mutate(dfnew.county, GasLevel=0)
+for (i in 1:dim(dfnew.county)[1])
+{
+  if(dfnew.county$averageOil[i]>=0 & dfnew.county$averageOil[i]<10) {dfnew.county$OilLevel[i] <- 0}
+  if(dfnew.county$averageOil[i]>=10 & dfnew.county$averageOil[i]<10^2) {dfnew.county$OilLevel[i] <- 1}
+  if(dfnew.county$averageOil[i]>=10^2 & dfnew.county$averageOil[i]<10^3) {dfnew.county$OilLevel[i] <- 2}
+  if(dfnew.county$averageOil[i]>=10^3 & dfnew.county$averageOil[i]<10^4) {dfnew.county$OilLevel[i] <- 3}
+  if(dfnew.county$averageOil[i]>=10^4 & dfnew.county$averageOil[i]<10^5) {dfnew.county$OilLevel[i] <- 4}
+  if(dfnew.county$averageOil[i]>=10^5 & dfnew.county$averageOil[i]<10^6) {dfnew.county$OilLevel[i] <- 5}
+  if(dfnew.county$averageOil[i]>=10^6 & dfnew.county$averageOil[i]<10^7) {dfnew.county$OilLevel[i] <- 6}
+  if(dfnew.county$averageOil[i]>=10^7 & dfnew.county$averageOil[i]<10^8) {dfnew.county$OilLevel[i] <- 7}
+  if(dfnew.county$averageOil[i]>=10^8 & dfnew.county$averageOil[i]<10^9) {dfnew.county$OilLevel[i] <- 8}
+}
+
+for (i in 1:dim(dfnew.county)[1])
+{
+  if(dfnew.county$averageGas[i]>=0 & dfnew.county$averageGas[i]<100) {dfnew.county$GasLevel[i] <- 0}
+  if(dfnew.county$averageGas[i]>=10^2 & dfnew.county$averageGas[i]<10^3) {dfnew.county$GasLevel[i] <- 1}
+  if(dfnew.county$averageGas[i]>=10^3 & dfnew.county$averageGas[i]<10^4) {dfnew.county$GasLevel[i] <- 2}
+  if(dfnew.county$averageGas[i]>=10^4 & dfnew.county$averageGas[i]<10^5) {dfnew.county$GasLevel[i] <- 3}
+  if(dfnew.county$averageGas[i]>=10^5 & dfnew.county$averageGas[i]<10^6) {dfnew.county$GasLevel[i] <- 4}
+  if(dfnew.county$averageGas[i]>=10^6 & dfnew.county$averageGas[i]<10^7) {dfnew.county$GasLevel[i] <- 5}
+  if(dfnew.county$averageGas[i]>=10^7 & dfnew.county$averageGas[i]<10^8) {dfnew.county$GasLevel[i] <- 6}
+  if(dfnew.county$averageGas[i]>=10^8 & dfnew.county$averageGas[i]<10^9) {dfnew.county$GasLevel[i] <- 7}
+  if(dfnew.county$averageGas[i]>=10^9 & dfnew.county$averageGas[i]<10^10) {dfnew.county$GasLevel[i] <- 8}
+}
+
+dfnew.county <- data.frame(dfnew.county)
+dfnew.county <- select(dfnew.county, -averageOil, -averageGas)
+
+head(dfnew.county)
+
+
+#Draw map graphics
+
+#extract reference data
+mapcounties <- map_data("county")
+mapcounties <- data.frame(mapcounties)
+mapcounties <- mapcounties[,c(5,6,1:4)]
+mapstates <- map_data("state")
+head(mapcounties)
+
+#merge data with ggplot county coordinates
+mergedata <- merge(x=dfnew.county, y=mapcounties, by.x=c("subregion","region"), by.y=c("subregion","region"), all= TRUE)
+mergedata <- arrange(mergedata, group, order)
+
+
+#draw maps of oil level distribution
+map <- ggplot(mergedata, aes(long,lat,group=group)) + geom_polygon(aes(fill=factor(OilLevel)))
+map <- map + scale_fill_brewer(palette="PuRd") +
+  coord_map(project="polyconic") 
+  
+#add state borders
+map <- map + geom_path(data = mapstates, colour = "white", size = .075)
+
+#add county borders
+map <- map + geom_path(data = mapcounties, colour = "white", size = .05, alpha = .1)
+
+#add title
+map <- map + ggtitle("Average Oil Level Distribution Map")
+
+map
+
+#draw maps of gas level distribution
+map <- ggplot(mergedata, aes(long,lat,group=group)) + geom_polygon(aes(fill=factor(GasLevel)))
+map <- map + scale_fill_brewer() +
+  coord_map(project="polyconic") 
+
+#add state borders
+map <- map + geom_path(data = mapstates, colour = "white", size = .075)
+
+#add county borders
+map <- map + geom_path(data = mapcounties, colour = "white", size = .05, alpha = .1)
+
+#add title
+map <- map + ggtitle("Average Gas Level Distribution Map")
+
+map
+```
+
+In order to vividly show the average gross withdrawals through 2000 to 2011 of oil and gas, we draw map graghics respectively. The darker the colour, the higher level of oil and gas average gross withdrawals.
+
+###(iii) Oil and gas withdrawals change level from 2000 to 2011 on the state level
+```{r}
+# Each State filled with growth indicator 
+library(ggplot2)
+
+
+#read tidy data 
+dfnew <- read.table("oilTidyData.txt")
+dfnew <- data.frame(dfnew)
+
+#draw  bar graphics
+state_oil_growth<- ggplot(dfnew, aes(x=Stabr, fill=oil_change_group))+
+  geom_bar() + labs(title = "Each State Filled with Growth Indicator", x = "States", y = "Counts")
+state_oil_growth
+
+state_gas_growth<- ggplot(dfnew, aes(x=Stabr, fill=gas_change_group))+
+  geom_bar() + labs(title = "Gas Withdrawals of Each State Filled with Growth Indicator", x = "States", y = "Counts")
+state_gas_growth
+
+state_oil_gas_growth<- ggplot(dfnew, aes(x=Stabr, fill=oil_gas_change_group))+
+  geom_bar() + labs(title = "Gas Withdrawals of Each State Filled with Growth Indicator", x = "States", y = "Counts")
+state_oil_gas_growth
+```
+
+Oil gas change group is a categorical variable based upon change in the dollar value of oil production. There are three level indicating different change range where H Growth indicates grows more than 20 million, H Decline indicates grows less than 20 million, and Status Quo indicates the between situation.
+
+The graghs drawn indicates the proportion of counties in each state with different growth rate of oil, gas or oil and gas annual gross withdrawals from 2000 to 2011. We can see from both graghs that Status Quo takes the biggest proportion in almost every state. 
+
+###(iv) Oil and gas withdrawals change level from 2000 to 2011 on the county level
+```{r}
+#Oil and Gas withdrawals change level map on the county level
+#subset and merge data of oil and gas withdrawals change level from 2000 to 2011 
+mergedata.c <- merge(x=dfnew.change, y=mapcounties, by.x=c("subregion","region"), by.y=c("subregion","region"), all= TRUE)
+mergedata.c <- arrange(mergedata.c, group, order)
+
+#draw maps of oil withdrawals change level from 2000 to 2011 
+map <- ggplot(mergedata.c, aes(long,lat,group=group)) + geom_polygon(aes(fill=oil_change_group))
+map <- map + scale_fill_brewer(palette="PuRd") +
+  coord_map(project="polyconic") 
+
+#add state borders
+map <- map + geom_path(data = mapstates, colour = "white", size = .075)
+
+#add county borders
+map <- map + geom_path(data = mapcounties, colour = "white", size = .05, alpha = .1)
+
+#add title
+map <- map + ggtitle("Oil Change Level Distribution Map")
+
+map
+
+
+#draw maps of gas withdrawals change level from 2000 to 2011 
+map <- ggplot(mergedata.c, aes(long,lat,group=group)) + geom_polygon(aes(fill=gas_change_group))
+map <- map + scale_fill_brewer() +
+  coord_map(project="polyconic") 
+
+#add state borders
+map <- map + geom_path(data = mapstates, colour = "white", size = .075)
+
+#add county borders
+map <- map + geom_path(data = mapcounties, colour = "white", size = .05, alpha = .1)
+
+map <- map + ggtitle("Gas Change Level Distribution Map")
+
+map
+
+
+#draw maps of oil and gas withdrawals change level from 2000 to 2011 
+map <- ggplot(mergedata.c, aes(long,lat,group=group)) + geom_polygon(aes(fill=oil_gas_change_group))
+map <- map + scale_fill_brewer(palette = "Spectral") +
+  coord_map(project="polyconic") 
+
+#add state borders
+map <- map + geom_path(data = mapstates, colour = "white", size = .075)
+
+#add county borders
+map <- map + geom_path(data = mapcounties, colour = "white", size = .05, alpha = .1)
+
+map <- map + ggtitle("Oil and Gas Change Level Distribution Map")
+
+map
+```
+
+Map graghics clearly show the proportion of three levels of oil and gas change and their distributions on the map of US. Oil, gas, oil and gas change level have similar distributions in terms of location. For most parts of the nation, the changes level are status quo. But there is a S shape area from north to south in the middle of US who enjoys either high growth or high decline.
+
+###(v) Oil and gas withdrawals analysis with Rural Urban Continuum Code
+```{r}
+#Oil and Gas total gross withdrawals distribution on the Rural Urban Continuum Code
+library(ggplot2)
+
+
+#read tidy data and select oil and gas Rural Urban Continuum Code data in year 2011
+dfnew <- read.table("oilTidyData.txt")
+dfnew <- data.frame(dfnew)
+dfnew.RUC <- select(dfnew, County_Name, Rural_Urban_Continuum_Code_2013, year:gaswithdraw)
+dfnew.RUC2011 <- filter(dfnew.RUC, year == 2011)
+
+#bar graphics indicating oil and gas withdraws corresponding to different Rural Urban Continuum Code
+gg <- ggplot(data = dfnew.RUC2011, aes(x = Rural_Urban_Continuum_Code_2013, y = oilwithdraw))
+gg + geom_bar(stat = "identity") + labs(title = "Oil withdraws with different Rural Urban Continuum Code", x = "Rural Urban Continuum Code", y = "Oil withdraws in 2011")
+
+gg <- ggplot(data = dfnew.RUC2011, aes(x = Rural_Urban_Continuum_Code_2013, y = gaswithdraw))
+gg + geom_bar(stat = "identity") + labs(title = "Gas withdraws with different Rural Urban Continuum Code", x = "Rural Urban Continuum Code", y = "Gas withdraws in 2011")
+
+```
+
+ERS Rural-Urban Continuum Codes distinguish metropolitan (metro) counties by the population size of their metro area, and nonmetropolitan (nonmetro) counties by degree of urbanization and adjacency to metro areas. The Office of Management and Budget’s 2013 metro and nonmetro categories have been subdivided into three metro and six nonmetro groupings, resulting in a nine-part county classification. The codes provide researchers working with county data a more detailed residential classification, beyond a simple metro-nonmetro dichotomy, for the analysis of trends related to degree of rurality and metro proximity.
+
+The values of code and their meanings are listed as follows:
+\begin{center}
+\begin{tabular}{|c|c|}\hline
+Code&Description\\\hline
+1&Counties in metro areas of 1 million population or more\\\hline
+2&Counties in metro areas of 250,000 to 1 million population\\\hline
+3&Counties in metro areas of fewer than 250,000 population\\\hline
+4&Urban population of 20,000 or more, adjacent to a metro area\\\hline
+5&Urban population of 20,000 or more, not adjacent to a metro area\\\hline
+6&Urban population of 2,500 to 19,999, adjacent to a metro area\\\hline
+7&Urban population of 2,500 to 19,999, not adjacent to a metro area\\\hline
+8&Completely rural or less than 2,500 urban population, adjacent to a metro area\\\hline
+9&Completely rural or less than 2,500 urban population, not adjacent to a metro area\\\hline
+\end{tabular}
+\end{center}
+
+These graghs are drawn with data in 2011. Counties in metro areas of 250,000 to 1 million population have the biggest oil withdrawals while Urban population of 20,000 or more, adjacent to a metro area have the smallest. 
+
+Counties in Urban population of 2,500 to 19,999, not adjacent to a metro area while Completely rural or less than 2,500 urban population, adjacent to a metro area.
+
+#5. Contribution
+In this project, we have two main contributions. Firstly, we provide a way of cleaning the raw data to get county-level oil and gas anual gross withdrawals tidy data for further exploration. Secondly, we explore the tidy data by showing a series vivid graghs and charts from two aspects, time and location. These work can be taken as solid foundation for future work.
+
+#6. Future Work
+Future work can be done in a quantitative way by modeling in Statistics on the basis of descriptive statistics analysis provided in this project.
+
+Some ideas for future work include:
+\newline a) What is the relationship between county type(metro or nonmetro) and oil/ gas gross annual withdrawals?
+\newline b) What is the relationship between county county population size and oil/ gas gross annual withdrawals?
+\newline c) Oil/ gas gross annual withdrawals prediction using data from past years

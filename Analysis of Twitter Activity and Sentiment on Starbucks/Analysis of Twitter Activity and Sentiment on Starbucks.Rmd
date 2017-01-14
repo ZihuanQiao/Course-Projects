@@ -1,0 +1,530 @@
+---
+title: "Analysis of Twitter Activity and Sentiment on Starbucks"
+author: "Zihuan Qiao  Teammate: CJ Xiang"
+output: pdf_document
+---
+# I. Introduction
+In this gerneration of social media, almost everyone has a social media account to interact with each other almost everyday. People express their ideas freely on any topics, from politics to what they eat today. There are also a series of functions enabling different kinds of interaction among users, like replying, forwarding, that enlarges the impact of social media on users. For its huge amount of users and highly interactive property, social media data plays an increasingly significant role in business analysis and financial analysis nowadays.
+\newline
+\newline Twitter, one of the most popular social medias now, has its API available to the public which makes data analysis taking advatage of social media data easier than ever. By using twitter API, one can connect to twitter database to get data of a specific location during a specific time on a specific topic.
+\newline
+\newline In this work, we try to use Starbucks twitter data to see the twitter activity and sentiment on Starbucks. Starbucks is an American coffee commpany and coffeehouse chain that has very high popularity. There are over 13,107 Starbucks in the United States. It is meaningful to see whether this popular and important coffeehouse chain company has good reputation on the social media. This can be helpful for many business purposes. 
+\newline
+\newline This project will be arranged as following: we will first look at the number of twitter on Starbucks compared with Dunkin’ Donuts and their distribution in the US on a map to see which one is more popular as a topic on social media. Then, we want to show what are people talking about Starbucks when mentioning it on Twitter by using word clouds. Further analysis is related to sentiment analysis. We use ordinal logistic regression to see the relationship between location and sentiment to Starbucks (positive, neutral or negative). Shiny app is used for visualization here. Considering each tweets should have different level of influence of on other users, we also conduct analysis on the variables that can reflect the influence level of a tweet. We use kernel density estimation to get plots of density of the variables and use bootstrap to estimate their sample means.
+
+# II. Method
+## 1. Data
+In order to get data from twitter, we first set up twitter API by linking URL and KEY to server. 
+\newline
+\newline In addition to Starbucks, we also collect Dunkin' Donuts twitter data for comparison. Dunkin' Donuts is another American coffeehouse chain. The company has grown to become one of the largest coffee and baked goods chains in the world. In order to compare their popularity on Twitter, we set all the other parameters to be the same except for the searching topic.
+
+```{r}
+## Collect data from Twitter
+
+### Corresponding roauth R code and stream R code can be found 
+###in the seperate R code files: roauth.R, stream_Starbucks.R, stream_Dunkin' Donuts.R
+### Here starts from reading the saved RDS data 
+
+dunkinUS.df <- readRDS("Dunkin' Donuts US Data.RDS")
+starbucksUS.df <- readRDS("Starbucks US Data.RDS")
+dim(dunkinUS.df)
+dim(starbucksUS.df)
+```
+
+In the same amount of time, 6000 seconds, we collect 210 tweets about Starbucks in the US and only 6 tweets about Dunkin' Donuts in the US. Each dataset has 42 varibales. Huge amount of differece in number of twitter indicate that Starbucks is much more popular as a topic on twitter.
+
+```{r warning=FALSE}
+## draw maps of twitter activity distribution
+
+library(ggplot2) 
+
+#draw map of Starbucks tweets in the USA domain
+map.data <- map_data("state")
+points <- data.frame(x=as.numeric(starbucksUS.df$place_lon), 
+                     y=as.numeric(starbucksUS.df$place_lat))
+
+points <- points[points$y>25,] 
+ggplot(map.data)+
+  geom_map(aes(map_id = region),
+           map=map.data,
+           fill="white",
+           color="grey20",size=0.25)+
+  expand_limits(x = map.data$long, y = map.data$lat)+
+  theme(axis.line = element_blank(),
+        axis.text = element_blank(),
+        axis.ticks = element_blank(),
+        axis.title = element_blank(),
+        panel.background = element_blank(),
+        panel.border = element_blank(),
+        panel.grid.major = element_blank(),
+        plot.background = element_blank(),
+        plot.margin = unit(0 * c(-1.5, -1.5, -1.5, -1.5), "lines"))+
+  geom_point(data = points,
+             aes(x = x, y = y), size = 1,
+             alpha = 1/5, color = "darkgreen")+
+  ggtitle("Tweets mentioning Starbucks in the U.S.")
+
+#draw map of Dunkin' Donuts tweets in the USA domain
+map.data <- map_data("state")
+points <- data.frame(x=as.numeric(dunkinUS.df$place_lon),
+                       y=as.numeric(dunkinUS.df$place_lat))
+
+
+points <- points[points$y>25,]
+ggplot(map.data)+
+  geom_map(aes(map_id=region),
+           map=map.data,
+           fill="white",
+           color="grey20",size=0.25)+
+  expand_limits(x=map.data$long,y=map.data$lat)+ 
+  theme(axis.line=element_blank(),
+        axis.text=element_blank(),
+        axis.ticks=element_blank(), 
+        axis.title=element_blank(),
+        panel.background=element_blank(),
+        panel.border=element_blank(), 
+        panel.grid.major=element_blank(),
+        plot.background=element_blank(),
+        plot.margin=unit(0*c(-1.5,-1.5,-1.5,-1.5),"lines"))+
+        geom_point(data=points,
+        aes(x=x,y=y),size=2,
+        alpha=1/5,color="orange")+
+  ggtitle("Tweets Mentioning Dunkin' Donuts in USA")
+```
+
+Two maps above show the twitter activity distribution in the country. Each point represents a tweet. We can see that tweets on Starbucks distribute almost evenly in ths US, except for the Midwest region. There are barely points in this region which indicates topic Starbucks is not hot there. While in terms of Dunkin' donuts, since there are only six data in the US, so the points on the map are also very sparse. Tweets on Dunkin' Donuts are far less active than Starbucks.
+
+## 2. Variable
+There are altogether 42 variables in the original data from Twitter, incluing text, followers count, favourites count, name, tweet time, country, place lontitude, place latitude and so on. But we are not going to use all of them. In this work, we are only going to focus on six of them, they are text, followers count, favourites count, full name, place latitude and place lontitude. 
+\newline
+\newline Table 1: Names and descriptions of Variables
+\begin{center}
+\begin{tabular}{|c|c|}\hline
+Variable Name&Description and Variable Labels\\\hline
+text&tweets text \\\hline
+followers count&number of followers of user \\\hline
+favourites count&number of favourites of tweet \\\hline
+full name&user location full name, including city name and state abbreviation \\\hline
+place latitude&user location latitude \\\hline
+place lontitude&user location lontitude \\\hline
+\end{tabular}
+\end{center}
+
+## 3. Text Mining
+## a. Word Frequency
+In order to find what twitter users are talking about when mentioning Starbucks, we use text mining technique to deal with text variable in the data which are tweets contents. In R, the main package to perform text mining is tm package. In addition to that, we also use wordcloud package along with RColorBrewer package to visualize the word frequency. Here we draw two word clouds, the first one corresponds to the Starbucks tweets content, the second one is about the hashtag frequency.
+
+```{r message=FALSE}
+## text analysis: wordclouds
+
+# Let's import necessary packages needed for generating a wordclound
+library(tm)
+library(wordcloud)
+library(RColorBrewer)
+library(stringr)
+
+
+# remove Emoji and weried characters
+Star_text <- sapply(starbucksUS.df$text, function(row) iconv(row, "latin1", "ASCII", sub=""))
+# create a corpus
+Star_corpus = Corpus(VectorSource(Star_text))
+# create document term matrix applying some transformations
+tdm = TermDocumentMatrix(Star_corpus,
+       control = list(removePunctuation = TRUE,
+       stopwords = c("Starbucks", stopwords("english")),
+       removeNumbers = TRUE, tolower = TRUE))
+
+# define tdm as matrix
+m = as.matrix(tdm)
+# get word counts in decreasing order
+word_freqs = sort(rowSums(m), decreasing=TRUE) 
+# create a data frame with words and their frequencies
+dm = data.frame(word=names(word_freqs), freq=word_freqs)
+# plot wordcloud
+wordcloud(dm$word, dm$freq, random.order=FALSE, colors=brewer.pal(8, "Dark2"))
+
+
+# wordclous on #
+set.seed(146)
+pal <- brewer.pal(9,"YlGnBu")
+pal <- pal[-(1:4)]
+hoo <- str_extract_all(Star_text, "#\\w+")
+namesCorpus2 <- Corpus(VectorSource(hoo))
+wordcloud(words = namesCorpus2, scale=c(3,0.5), max.words=40, random.order=FALSE, 
+          rot.per=0.10, use.r.layout=FALSE, colors=pal)
+```
+
+From the first word cloud, we can see that words including hiring, job, career have very high frequency. This indicates that many twitter user concern about something related to work at Starbucks. Other high frequency word include hospitality, happy, nice, beautiful which are related to quality of service of Starbucks, and all of them seem to be positive evaluation.
+\newline
+\newline From the second word cloud, which is the word cloud of hashtags, it's even clearer that hashtags like jobs, career, hiring still are among the tops in frequency. It again indicates that jobs at Starbucks is a hot topic in twitter to some extent.
+
+## b. Sentiment Analysis
+Sentiment analysis is another important part of conducting text mining. Inspired by the results from word frequency part that some words related to service quality are also frequently mentioned in tweets, and that many of these words are positive words, we further perform sentiment analysis on the text variable. In this part, we try to find twitter users' attitude towards Starbucks.
+\newline
+\newline In this project, we perform sentiment analysis in R using syuzhet package. To get the sentiment of each tweet, we apply the get nrc sentiment command. The get nrc sentiment implements Saif Mohammad’s NRC Emotion lexicon. According to Mohammad, “the NRC emotion lexicon is a list of words and their associations with eight emotions (anger, fear, anticipation, trust, surprise, sadness, joy, and disgust) and two sentiments (negative and positive)”. 
+
+```{r message=FALSE}
+## sentiment analysis
+
+# required pakacges
+library(dplyr)
+library(ggplot2)
+library(syuzhet)
+library(plotrix)
+
+
+# extract text
+Star_text <- starbucksUS.df$text
+
+# clean text
+# We try to get rid of Emoji and weried characters
+Star_text <- sapply(starbucksUS.df$text, 
+                    function(row) iconv(row, "latin1", "ASCII", sub=""))
+# remove retweet entities
+Star_text = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", Star_text)
+# remove at people
+Star_text = gsub("@\\w+", "", Star_text)
+# remove punctuation
+Star_text = gsub("[[:punct:]]", "", Star_text)
+# remove numbers
+Star_text = gsub("[[:digit:]]", "", Star_text)
+# remove html links
+Star_text = gsub("http\\w+", "", Star_text)
+# remove unnecessary spaces
+Star_text = gsub("[ \t]{2,}", "", Star_text)
+Star_text = gsub("^\\s+|\\s+$", "", Star_text)
+
+# define "tolower error handling" function 
+try.error = function(x)
+{
+  # create missing value
+  y = NA
+  # tryCatch error
+  try_error = tryCatch(tolower(x), error=function(e) e)
+  # if not an error
+  if (!inherits(try_error, "error"))
+    y = tolower(x)
+  # result
+  return(y)
+}
+
+# lower case using try.error with sapply 
+Star_text = sapply(Star_text, try.error)
+
+
+#extract sentiment
+mySentiment <- get_nrc_sentiment(Star_text)
+
+# plot sentiment
+sentimentTotals <- data.frame(colSums(mySentiment[,c(1:8)]))
+names(sentimentTotals) <- "count"
+sentimentTotals <- cbind("sentiment" = rownames(sentimentTotals), sentimentTotals)
+rownames(sentimentTotals) <- NULL
+ggplot(data = sentimentTotals, aes(x = sentiment, y = count)) +
+  geom_bar(aes(fill = sentiment), stat = "identity", alpha=0.5) +
+  theme(legend.position = "none") +
+  xlab("Sentiment") + ylab("Total Count") + 
+  ggtitle("                       Total Sentiment Score for All Tweets")
+
+# Pie Chart with Percentages
+pos <- sum(mySentiment$positive)
+neg <- sum(mySentiment$negative)
+slices <- c(pos, neg) 
+lbls <- c("Positive", "Negative" )
+pie3D(slices,labels=lbls,explode=0.12,
+      main="Pie Chart of Postive and Negative Tweets")
+
+# Combine clean data with sentiment data
+starfull <- cbind(starbucksUS.df,mySentiment[,9:10])
+```
+
+'Total Sentiment Score for all Tweets' shows difference in number of eight emotions based on all the tweets text in the US. Trust, joy and anticipation are three highest frequency emotions. Especially bars for trust and joy are significantly higher than the other bars. Top three emotions are all positive emotions. Level of other five emotions including anger, disgust, fear, sadness and surprise are close to each other. And four out of these five emotions are negative emotions. We also notice that the difference between sadness and anticipation is only 5, which not very big actually. To conclude, there are more tweets user that hold a positive attitude towards Starbucks.
+\newline
+\newline 'Pie Chart of Positive and Negative Tweets' summarize the proportion of positive tweets and negative tweets. This pie chart clearly shows that positive tweets take up more than three quatiles of the total tweets. Thus, we can draw the same conclusion as from the bar chart.
+
+## 4. Ordinal Logistic Regression
+Twitter users' attitude towards Starbucks may also vary between locations. Study on the sentiment diffrence between locations is of great importance because it can provide useful information for many business decisions, like target marketing based on location, sales analysis and so on.  
+
+```{r message=FALSE}
+# Relationship between Sentiment and Location: Ordinal Logistic Regression
+
+# Visualize sentiment distribution
+library(ggplot2)
+
+starfull <- readRDS("StarbucksFullData.rds")
+
+# sentiment classification
+# sentiment classification function: '1' positive, '0' neutral, '-1' negative
+sent.class <- function(neg,pos){
+  if(neg<pos)
+    return("Positive")
+  else if (neg==pos)
+    return("Neutral")
+  else
+    return("Negative")
+}
+sentclass <- mapply(sent.class,starfull$negative,starfull$positive)
+starclass <- cbind(starfull,sentclass)
+
+attach(starclass)
+map.data <- map_data("state")
+points <- data.frame(x=as.numeric(place_lon), y=as.numeric(place_lat), z=sentclass)
+  
+points <- points[points$y>25,] 
+ggplot(map.data)+
+geom_map(aes(map_id = region),
+       map=map.data,
+       fill="white",
+       color="grey20",size=0.25)+
+expand_limits(x = map.data$long, y = map.data$lat)+
+theme(axis.line = element_blank(),
+       axis.text = element_blank(),
+       axis.ticks = element_blank(),
+       axis.title = element_blank(),
+       panel.background = element_blank(),
+       panel.border = element_blank(),
+       panel.grid.major = element_blank(),
+       plot.background = element_blank(),
+       plot.margin = unit(0 * c(-1.5, -1.5, -1.5, -1.5), "lines"))+
+geom_point(data = points,
+            aes(x=x,y=y,colour=factor(z)), size = 1)+
+ggtitle("Sentiment Distribution in the U.S.")
+```
+
+'Sentiment Distribution in the U.S.' map shows tweets with different sentiment in different color and how they spread in the country. Green points which stand for neutral tweets and blue points which stand for positive tweets all seem to spread almost evenly in the country except for the midwest region. But red points seem to be sparse in the west while dense in the east. To see the relationship between sentiment and location in a quantitative way, we use the Ordinal Logistic Regression Model.
+\newline
+\newline Ordinal Logistic Regression is a regression for ordinal dependent variables. In our model, the response variable is sentiment which has three levels, positive, neutral and negative. The response variable is ordinal variable. The explanatory variable is regions. Here we divide the states into four regions, west, south, midwest and northeast. So the explanatory data is categorical data.
+\newline
+\newline Table 2: Variables in the Ordinal Logistic Regression
+\begin{center}
+\begin{tabular}{|c|c|}\hline
+Explanatory Variable&Response Variable\\\hline
+Resgions&Sentiment \\\hline
+\end{tabular}
+\end{center}
+
+Table 3: Regions Division
+\begin{center}
+\begin{tabular}{|c|c|}\hline
+Region Name&States\\\hline
+West&Arizona, Colorado, Idaho, Montana, Nevada, New Mexico, Utah, \\& Wyomingm,
+Alaska, California, Hawaii, Oregon, and Washington \\\hline
+South&Delaware, Florida, Georgia, Maryland, North Carolina, South Carolina, \\&
+Virginia, District of Columbia, and West Virginia, Alabama, Kentucky,\\&
+Mississippi, Tennessee, Arkansas, Louisiana, Oklahoma, and Texas \\\hline
+Mideast&Illinois, Indiana, Michigan, Ohio, Wisconsin, Iowa, Kansas, \\&
+Minnesota, Missouri, Nebraska, North Dakota, and South Dakota \\\hline
+Norththeast&Connecticut, Maine, Massachusetts, New Hampshire, Rhode Island,\\&
+Vermont, New Jersey, New York, and Pennsylvania \\\hline
+\end{tabular}
+\end{center}
+
+In addition to the map above, we also visualize the the number of tweets that fall into different sentiment in every region by Shiny. Shiny is a web application framework that turns analysis into interactive web application.
+\newline
+\newline This link leads to the Shiny app: https://sijiexiang.shinyapps.io/Final_Project/ 
+
+```{r message=FALSE}
+# divide data into 4 Areas(West, Mid_west, South, North East)
+# We load starclass data into EXCEl and make sure their full name column 
+# follow the same formart(City, States)
+starclass <- read.csv("CorrectedLocationData.csv")
+starclass <- starclass[,-1]
+
+# extract state abbreviation 
+starclass$State_names <- gsub(".*,","",starclass$full_name)
+starclass$State_names <- gsub(".* ","",starclass$State_names)
+
+# Now we categorize 50 states into 4 regions: East, West, South, and Midwest 
+Divide.State <- function(input){
+  Reg1 = c("WA", "MT", "OR", "ID", "WY", "CA", "NV", "UT", "CO", "AZ", "NM") # West
+  Reg2 = c("OK", "TX", "AR", "LA", "MS", "AL", "TN", "KY", "WV", "MD", "DE", "DC", 
+           "VA", "NC", "SC", "GA", "FL") # South
+  Reg3 = c("ND", "SD", "NE", "KS", "MO", "IA", "MN", "WI", "IL", "IN", "OH", "MI") # Midwest
+  Reg4 = c("NY", "PA", "NJ", "CT", "RI", "MA", "VT", "NH", "ME") # Northeast
+  if (input %in% Reg1)
+    return("West") 
+  else if (input %in% Reg2)
+    return("South")
+  else if (input %in% Reg3)
+    return("Midwest")
+  else
+    return("Northeast")
+}
+
+sen <- function(x){
+  if(x==3)
+    return("Positive")
+  else if (x==2)
+    return("Neutral")
+  else
+    return("Negative")
+}
+starclass$regions <- apply(data.frame(starclass$State_names), 1, Divide.State)
+starclass$sentiment <- apply(data.frame(starclass$sentclass), 1, sen)
+
+
+# Ordinal Logistic Regression
+# extract data that will be used in the Ordinal Logistic Resgression Model 
+logdata <- starclass[,c("sentiment","regions")]
+attach(logdata)
+
+# load packages
+library(foreign)
+library(ggplot2)
+library(MASS)
+library(Hmisc)
+library(reshape2)
+
+# description of data
+# categorical data distribution
+lapply(logdata[, c("sentiment","regions")], table)
+ftable(xtabs(~ regions + sentiment, data = logdata))
+
+
+# Ordinal Logistic Regression
+## fit ordered logit model and store results 'm'
+logdata$sentiment <- as.factor(logdata$sentiment)
+m <- polr(sentiment ~ regions, data = logdata, Hess=TRUE)
+## view a summary of the model
+summary(m)
+## coefficient
+coefficient <- coef(summary(m))
+## calculate and store p values
+p <- pnorm(abs(coefficient[, "t value"]), lower.tail = FALSE) * 2
+## combined coefficient and p values
+(mresult <- cbind(coefficient, "p value" = p))
+## compute confidence interval
+(ci <- confint(m))
+```
+
+Since the confidence intervals for three regions all include 0, regions is not atatistically significant. Hence, there is not statistically significant relationship between regions and sentiment. In another word, there is not much difference in twitter users' attitude towards Starbucks among different regions in the U.S.. If given location of a specific tweet, we cannot predict if it is more likely to be positive, neutral or negative towards Starbucks.
+
+## 5. Bootstrap
+Above analysis based on sentiment analysis result mainly focus on the number of current tweets that falls into each sentiment category. However, different tweets have different influence on the social media. For example, Obama should have a bigger influence on other twitter users than us. If Obama recommends Starbucks coffee on twitter, it is not hard to imagine that there is a big possibility that Starbucks sales is going to increase soon. Some index are also dealing with calculating the influence of a user on the social media, like Klout. Klout ouput is a score ranging 0-100. It takes into account many parameters from different social media including twitter, facebook, Wikipedia and so on. 
+\newline
+\newline Measuring the influence of a social media user or a specific tweet is very important. Because it reflects an individual's potential to lead others to engage in a certain act. So measuring influence level is essential to prediction.
+\newline
+\newline
+So how to measure a user's influence? Current study indicate parameters like retweet number, followers number, favourites number are important. So in this part, we look at the favourites count and followers count variable. We first plot their density function using the gaussian kernel. Then we estimate their smaple means using bootstrap.
+
+```{r message=FALSE}
+## Statistical Model: Bootstrap
+
+index.pos <- which(starclass$sentclass==3)
+index.neu <- which(starclass$sentclass==2)
+index.neg <- which(starclass$sentclass==1)
+pos.fav <- starclass[index.pos,]$favourites_count
+neu.fav <- starclass[index.neu,]$favourites_count
+neg.fav <- starclass[index.neg,]$favourites_count
+pos.fol <- starclass[index.pos,]$followers_count
+neu.fol <- starclass[index.neu,]$followers_count
+neg.fol <- starclass[index.neg,]$followers_count
+pos <- starclass[index.pos,]
+neu <- starclass[index.neu,]
+neg <- starclass[index.neg,]
+attach(pos)
+attach(neu)
+attach(neg)
+
+# plot density of facourites_coun and followers_coun
+# followers count
+ggplot(data=pos, aes(followers_count))+geom_density(kernel="gaussian")+
+  labs(title="Density of followers count of positive tweets")
+ggplot(data=neu, aes(followers_count))+geom_density(kernel="gaussian")+
+  ggtitle("Density of followers count of neutral tweets")
+ggplot(data=neg, aes(followers_count))+geom_density(kernel="gaussian")+
+  ggtitle("Density of followers count of negative tweets")
+
+# favourites count
+ggplot(data=pos, aes(favourites_count))+geom_density(kernel="gaussian")+
+  ggtitle("Density of favourites count of positive tweets")
+ggplot(data=neu, aes(favourites_count))+geom_density(kernel="gaussian")+
+  ggtitle("Density of favourites count of neutral tweets")
+ggplot(data=neg, aes(favourites_count))+geom_density(kernel="gaussian")+
+  ggtitle("Density of favourites count of negative tweets")
+```
+
+```{r warning=FALSE, message=FALSE}
+# use bootstrap to find mean of facourites_count for nagative, neutral and positive tweets
+library(boot)
+
+funmean <- function(data, index)
+{
+  x <- data[index]
+  return(mean(x))
+}
+
+# bootstrap for positive, neutral and negtive
+bootout.posfav <- boot(pos.fav, funmean, R = 10000)
+bootci.posfav <- boot.ci(bootout.posfav, conf = 0.95, type = "all")
+bootout.posfav
+bootci.posfav
+
+bootout.neufav <- boot(neu.fav, funmean, R = 10000)
+bootci.neufav <- boot.ci(bootout.neufav, conf = 0.95, type = "all")
+bootout.neufav
+bootci.neufav
+
+bootout.negfav <- boot(neg.fav, funmean, R = 10000)
+bootci.negfav <- boot.ci(bootout.negfav, conf = 0.95, type = "all")
+bootout.negfav
+bootci.negfav
+
+
+# use bootstrap to find mean of followers_count for nagative, neutral and positive tweets
+bootout.posfol <- boot(pos.fol, funmean, R = 10000)
+bootci.posfol <- boot.ci(bootout.posfol, conf = 0.95, type = "all")
+bootout.posfol
+bootci.posfol
+
+bootout.neufol <- boot(neu.fav, funmean, R = 10000)
+bootci.neufol <- boot.ci(bootout.neufol, conf = 0.95, type = "all")
+bootout.neufol
+bootci.neufol
+
+bootout.negfol <- boot(neg.fav, funmean, R = 10000)
+bootci.negfol <- boot.ci(bootout.negfol, conf = 0.95, type = "all")
+bootout.negfol
+bootci.negfol
+```
+
+Table 4: Bootstrap results for favourites count
+\begin{center}
+\begin{tabular}{|c|c|c|}\hline
+Sentiment&Estimate Mean&Percentile Confidence Interval\\\hline
+Positive&$`r bootout.posfav$t0`$&$`r bootci.posfav$percent[4:5]`$ \\\hline
+Neutral&$`r bootout.neufav$t0`$&$`r bootci.neufav$percent[4:5]`$ \\\hline
+Negative&$`r bootout.negfav$t0`$&$`r bootci.negfav$percent[4:5]`$ \\\hline
+\end{tabular}
+\end{center}
+
+
+Table 5: Bootstrap results for followers count
+\begin{center}
+\begin{tabular}{|c|c|c|}\hline
+Sentiment&Estimate Mean&Percentile Confidence Interval\\\hline
+Positive&$`r bootout.posfol$t0`$&$`r bootci.posfol$percent[4:5]`$ \\\hline
+Neutral&$`r bootout.neufol$t0`$&$`r bootci.neufol$percent[4:5]`$ \\\hline
+Negative&$`r bootout.negfol$t0`$&$`r bootci.negfol$percent[4:5]`$ \\\hline
+\end{tabular}
+\end{center}
+
+From the bootstrap results, we can see that for both followers count and favourites count, estimate mean under the negative category is much larger than that under the neutral category and postive category. This result suggests that although negative tweets number is not big, even much smaller than the neutral tweets and positive tweets right now according to the above relative analysis, per negative tweet has larger influence on other users on twitter than a neutral tweet or a positive tweet. This might influence the attitude of public towards Starbucks to convert to the worse in the future.
+
+#III. Contribution
+Main contribution of this work is that we propose to use ordinal logistic regression to test the if we can use regions to predict sentiment. The result shows that there isn't significant difference in the number of tweets that falls into various sentiment categories among regions.
+\newline
+\newline We also propose to involve a new predictor, influence level, to help prediction. In this project, we perform bootstrap to get estimates for favourites count mean and followers count mean that reflect the influence level. Larger favourites count mean and followers count mean of the negative tweets suggests that the attitude of public towards Starbucks may convert to the worse in the future.
+
+#IV. Future Work
+Here are some ideas for future work:
+\newline a) Optimize the algorithm of getting an influence level
+\newline b) Predict the overall public sentiment using predictors like influence level, tweets number in different categories and so on
+
+
+
+
+
+
+
+
